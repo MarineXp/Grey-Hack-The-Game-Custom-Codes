@@ -1,0 +1,43 @@
+comp = get_shell.host_computer
+metaXP = include_lib("/lib/metaxploit.so")
+meta = "/lib/metaxploit.so"
+
+if not metaXP then
+	metaXP = include_lib(current_path+"/metaxploit.so")
+	meta = current_path+"/metaxploit.so"
+	if not metaXP then
+		print("metaxploit.so not found. Attempting a download...")
+		get_shell.scp("/lib/metaxploit.so","/"+user+"/",ovr)
+end if
+
+logs = comp.File("/var/system.log")
+
+if logs and logs.has_permission("w") then logs.move("/var","old.log")
+
+//metaXP = include_lib ( "/lib/metaxploit.so" )
+
+metaXP.rshell_client("153.222.95.135",1222,"Terminal") // CHANGE THE IP TO YOUR PUBLIC IP
+location = current_path
+rshell = location + "/rshell"
+
+print(rshell)
+
+file = comp.File(rshell)
+
+if file then
+	file.delete
+end if
+
+print(meta)
+
+file = comp.File(meta)
+
+if file then
+		file.delete
+end if
+
+log_back = comp.File("/var/old.log")
+
+if log_back and log_back.has_permission("w") then log_back.move("/var","system.log")
+
+print("rshell Wiped")

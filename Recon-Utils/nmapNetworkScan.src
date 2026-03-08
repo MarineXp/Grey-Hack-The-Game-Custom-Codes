@@ -1,0 +1,101 @@
+myLocalIp = get_router().local_ip
+usingLocalIp = false
+lookingForSpecificLAN = false
+lanLookingFor = ""
+specificLanTrigger = 0
+
+if params.len == 0 then usingLocalIp = true
+if params.len == 2 then
+	lookingForSpecificLAN = true
+	lanLookingFor = params[1]
+end if
+if params.len != 0 and params[0] == "-h" then exit("<b>Usage: "+program_path.split("/")[-1]+" [ip_address] [OPTIONAL: LAN You're looking for]</b>")
+if usingLocalIp then
+	splitIp = myLocalIp.split("\.")
+	ipWithoutLast = splitIp[:-1].join(".") + "."
+	generalIp = ipWithoutLast + "X"
+else
+	splitIp = params[0].split("\.")
+	ipWithoutLast = splitIp[:-1].join(".") + "."
+	generalIp = ipWithoutLast + "X"
+end if
+confirmString = "Found an ip that is: " + generalIp
+print(confirmString)
+
+completeReport = "PORT STATE SERVICE VERSION LAN PUBLIC-IP"
+for i in range(0, 255)
+	ipAddress = ipWithoutLast + str(i)
+	if (is_valid_ip(ipAddress)) and (get_shell.host_computer.is_network_active) then
+		if ipAddress == "127.0.0.1" then ipAddress = get_shell.host_computer.local_ip
+		isLanIp = is_lan_ip( ipAddress )
+
+		if isLanIp then
+   			router = get_router;
+		else
+   			router = get_router(ipAddress )
+		end if
+
+		if router == null then continue
+		ports = null
+
+		if not isLanIp then
+   			ports = router.used_ports
+		else
+   			ports = router.device_ports(ipAddress)
+		end if
+
+		if ports == null then continue
+		if typeof(ports) == "string" then continue
+
+		if(ports.len == 0) then continue
+		info = "PORT STATE SERVICE VERSION LAN"
+		if specificLanTrigger == 0 or not lookingForSpecificLAN then
+			print("\nStarting nmap v1.1 at " + current_date)
+			print("Interesting ports on " + ipAddress + "\n")
+		end if
+		specificLanTrigger = specificLanTrigger + 1
+
+		for port in ports
+   			service_info = router.port_info(port)
+   			lan_ips = port.get_lan_ip
+   			port_status = "open"
+
+   			if(port.is_closed and not isLanIp) then
+      			port_status = "closed"
+   			end if
+
+			if not lookingForSpecificLAN then info = info + "\n" + port.port_number + " " + port_status + " " + service_info + " " + lan_ips
+			lanLookingForList = lanLookingFor.split("\.")
+			lan_ipsList = lan_ips.split("\.")
+			excludingLastLook = lanLookingForList[:-1].join(".")
+			excludingLastFound = lan_ipsList[:-1].join(".")
+			if excludingLastLook == excludingLastFound or lan_ips == lanLookingFor then
+				info = info + "\n" + port.port_number + " " + port_status + " " + service_info + " " + lan_ips
+				completeReport = completeReport + "\n" + port.port_number + " " + port_status + " " + service_info + " " + lan_ips + " " + ipAddress
+			end if
+		end for
+
+		if lookingForSpecificLAN and lanLookingFor != "" then
+			print("Trying to find Local IP: " + lanLookingFor + " on IP: " + ipAddress)
+			if lan_ips == lanLookingFor then
+				print("Exact match found!\n")
+				print(format_columns(info) + "\n")
+			end if
+			lanLookingForList = lanLookingFor.split("\.")
+			lan_ipsList = lan_ips.split("\.")
+			excludingLastLook = lanLookingForList[:-1].join(".")
+			excludingLastFound = lan_ipsList[:-1].join(".")
+			if excludingLastLook == excludingLastFound then
+				print("Found on the same LAN!\n")
+				print(format_columns(info) + "\n")
+			end if
+		else
+			print(format_columns(info) + "\n")
+		end if
+	end if
+end for
+
+if lookingForSpecificLAN then
+	print("\nFULL REPORT")
+	print(format_columns(completeReport) + "\n")
+end if
