@@ -1,3 +1,4 @@
+//You must have an rshell interface set up to use this! Set up an open port on 1222
 comp = get_shell.host_computer
 metaXP = include_lib("/lib/metaxploit.so")
 meta = "/lib/metaxploit.so"
@@ -16,6 +17,7 @@ if logs and logs.has_permission("w") then logs.move("/var","old.log")
 
 //metaXP = include_lib ( "/lib/metaxploit.so" )
 
+//Change the ip below to whatever your Public IP is
 metaXP.rshell_client("153.222.95.135",1222,"Terminal") // CHANGE THE IP TO YOUR PUBLIC IP
 location = current_path
 rshell = location + "/rshell"
