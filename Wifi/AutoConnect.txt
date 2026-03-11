@@ -1,0 +1,93 @@
+//Script presets start
+signal_power_to_acks = {1: 300000, 2: 150000, 3: 100000, 4: 75000, 5: 60000, 6: 50000, 7: 42857, 8: 37500, 9: 33333, 10: 30000, 11: 27273, 12: 25000, 13: 23077, 14: 21429, 15: 20000, 16: 18750, 17: 17647, 18: 16667, 19: 15789, 20: 15000, 21: 14286, 22: 13636, 23: 13043, 24: 12500, 25: 12000, 26: 11538, 27: 11111, 28: 10714, 29: 10345, 30: 10000, 31: 9677, 32: 9375, 33: 9091, 34: 8824, 35: 8571, 36: 8333, 37: 8108, 38: 7895, 39: 7692, 40: 7500, 41: 7317, 42: 7143, 43: 6977, 44: 6818, 45: 6667, 46: 6522, 47: 6383, 48: 6250, 49: 6122, 50: 6000, 51: 5882, 52: 5769, 53: 5660, 54: 5556, 55: 5455, 56: 5357, 57: 5263, 58: 5172, 59: 5085, 60: 5000, 61: 4918, 62: 4839, 63: 4762, 64: 4688, 65: 4615, 66: 4545, 67: 4478, 68: 4412, 69: 4348, 70: 4286, 71: 4225, 72: 4167, 73: 4110, 74: 4054, 75: 4000, 76: 3947, 77: 3896, 78: 3846, 79: 3797, 80: 3750, 81: 3704, 82: 3659, 83: 3614, 84: 3571, 85: 3529, 86: 3488, 87: 3448, 88: 3409, 89: 3371, 90: 3333, 91: 3297, 92: 3261, 93: 3226, 94: 3191, 95: 3158, 96: 3125, 97: 3093, 98: 3061, 99: 3030, 100: 3000}
+colorRed = "<color=#FF0000FF><b>"
+colorCyan = "<color=#00FFFFFF><b>"
+colorGold = "<color=#CCCC00FF><b>"
+colorGrey = "<color=#71858DFF><b>"
+colorGreen = "<color=#00FF00FF><b>"
+colorOlive = "<color=#048004FF><b>"
+colorWhite = "<color=#FFFFFFFF><b>"
+colorBlack = "<color=#000000FF><b>"
+colorOrange = "<color=#FF8400FF><b>"
+colorViolet = "<color=#8821FDFF><b>"
+colorMagenta = "<color=#FF00C8FF><b>"
+colorLightBlue = "<color=#2382FFFF><b>"
+//Script presets end
+
+runningShell = get_shell
+runningComputer = runningShell.host_computer
+networkDeviceInfo = runningComputer.network_devices
+cryptools = include_lib("/lib/crypto.so")
+
+if not cryptools then
+	cryptools = include_lib(current_path + "/crypto.so")
+end if
+if not cryptools then exit("Error: Can't find crypto.so library in the /lib path or the current folder")
+
+splitNetworkInfo = networkDeviceInfo.split(" ")
+if len(splitNetworkInfo) != 3 then exit(colorRed+"Expected only one network device but got: " + networkDeviceInfo)
+
+interfaceName = splitNetworkInfo[0]
+chipsetNum = splitNetworkInfo[1]
+isDeviceMonitorOn = splitNetworkInfo[2]
+if isDeviceMonitorOn[0] == "T" then isDeviceMonitorOn = "True" else "False"
+
+if isDeviceMonitorOn == "False" then
+	airmon("start", networkDeviceInfo)
+end if
+
+currentWifi = get_router.bssid_name
+
+networks = runningComputer.wifi_networks(interfaceName)
+bestNetworkBSSID = ""
+bestNetworkESSID = ""
+bestNetworkPerc = 0
+bestNetwork = ""
+
+for network in networks
+	networkStringSplit = network.split(" ")
+
+	networkBSSID = networkStringSplit[0]
+	networkESSID = networkStringSplit[2]
+	networkPerc = networkStringSplit[1].remove("%").val
+
+	if networkPerc > bestNetworkPerc and networkBSSID != currentWifi then
+		bestNetworkBSSID = networkBSSID
+		bestNetworkESSID = networkESSID
+		bestNetworkPerc = networkPerc
+		bestNetwork = colorCyan+network
+	end if
+end for
+
+if bestNetworkPerc == 0 then exit(colorRed+"Could not find a network...")
+
+info = colorGrey+"BSSID             PWR ESSID" + "\n" + bestNetwork
+print colorWhite+"Choosing to connect to wifi with info:"
+print info + "\n"
+
+print colorOrange+"Reading in packets. You do NOT need to CTRL + C. The request will stop automatically!"
+cryptools.aireplay(bestNetworkBSSID, bestNetworkESSID, signal_power_to_acks[bestNetworkPerc])
+
+captureFilePath = current_path + "/file.cap"
+captureFile = runningComputer.File(captureFilePath)
+
+if not captureFile then
+	fileErrorMessage = "Could not find file.cap from where the current terminal directory: " + current_path
+	exit(colorRed+fileErrorMessage)
+end if
+
+wifiPassword = cryptools.aircrack(captureFilePath)
+if not wifiPassword then exit(colorRed+"Could not crack wifi...")
+
+didWeConnect = runningComputer.connect_wifi(interfaceName, bestNetworkBSSID, bestNetworkESSID, wifiPassword)
+
+if didWeConnect then
+	successMessage = "Was successfully able to connect to: " + bestNetworkESSID + "!!!!!"
+	print colorGreen+successMessage
+else
+	failMessage = "Was not able to connect to: " + bestNetworkESSID + "....."
+	print colorRed+failMessage
+end if
+
+print colorWhite+"Removing the file.cap..."
+captureFile.delete
