@@ -18,6 +18,7 @@ runningShell = get_shell
 runningComputer = runningShell.host_computer
 networkDeviceInfo = runningComputer.network_devices
 cryptools = include_lib("/lib/crypto.so")
+alreadyConnected = "False"
 
 if not cryptools then
 	cryptools = include_lib(current_path + "/crypto.so")
@@ -30,13 +31,17 @@ if len(splitNetworkInfo) != 3 then exit(colorRed+"Expected only one network devi
 interfaceName = splitNetworkInfo[0]
 chipsetNum = splitNetworkInfo[1]
 isDeviceMonitorOn = splitNetworkInfo[2]
-if isDeviceMonitorOn[0] == "T" then isDeviceMonitorOn = "True" else "False"
+if isDeviceMonitorOn[0] == "T" then isDeviceMonitorOn = "True" else isDeviceMonitorOn = "False"
 
 if isDeviceMonitorOn == "False" then
-	airmon("start", networkDeviceInfo)
+	DeviceNotMonitor = "Please run the command: airmon start " + interfaceName
+	exit(colorRed+DeviceNotMonitor)
 end if
 
-currentWifi = get_router.bssid_name
+if runningComputer.is_network_active then
+	currentWifi = get_router.bssid_name
+	alreadyConnected = "True"
+end if
 
 networks = runningComputer.wifi_networks(interfaceName)
 bestNetworkBSSID = ""
@@ -51,11 +56,20 @@ for network in networks
 	networkESSID = networkStringSplit[2]
 	networkPerc = networkStringSplit[1].remove("%").val
 
-	if networkPerc > bestNetworkPerc and networkBSSID != currentWifi then
-		bestNetworkBSSID = networkBSSID
-		bestNetworkESSID = networkESSID
-		bestNetworkPerc = networkPerc
-		bestNetwork = colorCyan+network
+	if alreadyConnected == "True" then
+		if networkPerc > bestNetworkPerc and networkBSSID != currentWifi then
+			bestNetworkBSSID = networkBSSID
+			bestNetworkESSID = networkESSID
+			bestNetworkPerc = networkPerc
+			bestNetwork = colorCyan+network
+		end if
+	else
+		if networkPerc > bestNetworkPerc then
+			bestNetworkBSSID = networkBSSID
+			bestNetworkESSID = networkESSID
+			bestNetworkPerc = networkPerc
+			bestNetwork = colorCyan+network
+		end if
 	end if
 end for
 
